@@ -83,7 +83,10 @@ router.post('/signup', async (req: Request, res: Response) => {
 
     const { token, expiresAt } = createSession(user.id);
     setSessionCookie(res, token, expiresAt);
-    res.json({ user: publicUserFromRow(user), tier: req.viewer.tier });
+    // req.viewer was resolved before this cookie existed — derive the tier from
+    // the user we just authenticated instead.
+    const publicUser = publicUserFromRow(user);
+    res.json({ user: publicUser, tier: publicUser.emailVerified ? 'member' : 'free' });
   } catch (err) {
     fail(res, err);
   }
@@ -99,7 +102,8 @@ router.post('/login', async (req: Request, res: Response) => {
     }
     const { token, expiresAt } = createSession(user.id);
     setSessionCookie(res, token, expiresAt);
-    res.json({ user: publicUserFromRow(user), tier: req.viewer.tier });
+    const publicUser = publicUserFromRow(user);
+    res.json({ user: publicUser, tier: publicUser.emailVerified ? 'member' : 'free' });
   } catch (err) {
     fail(res, err);
   }

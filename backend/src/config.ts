@@ -15,7 +15,7 @@ export const CONFIG = {
   smtpPort: Number(process.env.SMTP_PORT ?? 587),
   smtpUser: process.env.SMTP_USER ?? '',
   smtpPass: process.env.SMTP_PASS ?? '',
-  fromAddress: process.env.FROM_ADDRESS ?? 'noreply@docsendpdf.dev',
+  fromAddress: process.env.FROM_ADDRESS ?? 'noreply@docsend-to-pdf.online',
 
   // ---- Auth ----
   dbPath: process.env.DB_PATH ?? '/app/data/app.db',

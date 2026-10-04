@@ -60,7 +60,8 @@ The app is designed to run behind nginx on a domain (TLS terminates at nginx,
 the container stays on plain HTTP :4000). The app already:
 
 - serves the frontend and API from the same origin with relative `/api/*` URLs
-  (no `PUBLIC_URL` / CORS config needed),
+  (no CORS config needed; set `PUBLIC_URL` so email verification links and the
+  Google sign-in redirect use the real domain),
 - sets `trust proxy` so `req.ip` / `req.protocol` reflect the forwarded request,
 - sends `X-Accel-Buffering: no` on the SSE stream so progress events flush
   through nginx without extra config,
@@ -75,10 +76,10 @@ setup — `<container-name>:4000` works when nginx shares the compose network):
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name docsend.example.com;
+    server_name docsend-to-pdf.online;
 
-    ssl_certificate     /etc/letsencrypt/live/docsend.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/docsend.example.com/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/docsend-to-pdf.online/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/docsend-to-pdf.online/privkey.pem;
 
     # Match the app's MAX_FILE_SIZE_BYTES (50 MB), otherwise nginx
     # rejects uploads with 413 at its 1 MB default.
@@ -107,7 +108,7 @@ server {
 
 server {
     listen 80;
-    server_name docsend.example.com;
+    server_name docsend-to-pdf.online;
     return 301 https://$host$request_uri;
 }
 ```
@@ -159,18 +160,19 @@ Notes:
 | `DB_PATH` | `/app/data/app.db` | SQLite file (users/sessions/tokens). Keep it on a volume. |
 | `SESSION_TTL_MS` | `2592000000` | Session lifetime (30 days) |
 | `COOKIE_NAME` | `ds_session` | Session cookie name |
-| `COOKIE_SECURE` | `false` | Set `true` behind HTTPS nginx so the cookie is Secure-only |
-| `PUBLIC_URL` | `http://localhost:4000` | Public origin; used in email verification links and the post-Google redirect |
+| `COOKIE_SECURE` | `false` | Set `true` behind HTTPS nginx so the cookie is Secure-only (production value: `true`) |
+| `PUBLIC_URL` | `http://localhost:4000` | Public origin; used in email verification links and the post-Google redirect. Production: `https://docsend-to-pdf.online` |
 | `GOOGLE_CLIENT_ID` | `` | OAuth 2.0 client ID (Google Cloud Console → Credentials). Empty hides the Google button. |
 | `GOOGLE_CLIENT_SECRET` | `` | Matching OAuth client secret |
 | `EMAIL_ENABLED` | `false` | `true` requires SMTP below; otherwise signup auto-verifies and the verify link is logged to stdout (dev mode) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | `` / `587` / `` / `` | SMTP relay for verification emails |
-| `FROM_ADDRESS` | `noreply@docsendpdf.dev` | From address on verification emails |
+| `FROM_ADDRESS` | `noreply@docsend-to-pdf.online` | From address on verification emails |
 
 Google OAuth setup: create an **OAuth client ID (Web application)** at
 console.cloud.google.com → APIs & Services → Credentials, and add
-`https://<your-domain>/api/auth/google/callback` under *Authorized redirect
-URIs* (plus `http://localhost:4000/api/auth/google/callback` for local dev).
+`https://docsend-to-pdf.online/api/auth/google/callback` under *Authorized
+redirect URIs* (plus `http://localhost:4000/api/auth/google/callback` for local
+dev).
 
 ## Tiers
 
