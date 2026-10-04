@@ -1,10 +1,13 @@
 services:
-  app:
+  docsend2pdf:
+    container_name: docsend2pdf
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "4000:4000"
+    networks:
+      - docsend2pdf.net
+    expose:
+      - "4000"
     environment:
       PORT: "4000"
       HOST: "0.0.0.0"
@@ -21,7 +24,7 @@ services:
       - output:/app/output
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/api/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:4000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -30,3 +33,8 @@ services:
 volumes:
   uploads:
   output:
+
+networks:
+  docsend2pdf.net:
+    name: docsend2pdf.net
+    driver: bridge

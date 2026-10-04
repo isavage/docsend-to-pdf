@@ -1,0 +1,44 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      no_cache:
+        description: 'Rebuild Docker images without cache (--no-cache)'
+        required: false
+        type: boolean
+        default: false
+      cleanup:
+        description: 'Prune unused docker images'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Uncomment if VPS_* secrets are stored in a GitHub Environment named "production".
+    # environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to VPS
+        uses: isavage/deploy@v3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          user: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 2222 }}
+          # Defaults to /docker/<repo-name> -> /docker/docsend-to-pdf
+          target_dir: /docker/docsend-to-pdf
+          compose_file: docker-compose.yml
+          exclude: '.git, .github, node_modules, uploads, output, docs'
+          # Image is built on the VPS from source (no registry), so skip pull.
+          pull: false
+          build: true
+          no_cache: ${{ inputs.no_cache || false }}
+          force_recreate: true
+          service_name: docsend2pdf
+          cleanup: ${{ inputs.cleanup || false }}

@@ -92,6 +92,9 @@ router.get('/events/:id', (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
+    // Tell nginx not to buffer this response, otherwise SSE updates
+    // only arrive when the stream closes.
+    'X-Accel-Buffering': 'no',
   });
 
   let lastUpdate = jobStore.get(jobId)?.updatedAt;

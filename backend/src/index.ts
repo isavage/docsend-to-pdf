@@ -11,6 +11,11 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// We run behind an nginx reverse proxy (TLS terminates there),
+// so trust the first proxy hop for X-Forwarded-For / X-Forwarded-Proto.
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 

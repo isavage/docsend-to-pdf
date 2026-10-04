@@ -54,6 +54,72 @@ docker compose up --build
 curl http://localhost:4000/api/health
 ```
 
+## Reverse Proxy (nginx)
+
+The app is designed to run behind nginx on a domain (TLS terminates at nginx,
+the container stays on plain HTTP :4000). The app already:
+
+- serves the frontend and API from the same origin with relative `/api/*` URLs
+  (no `PUBLIC_URL` / CORS config needed),
+- sets `trust proxy` so `req.ip` / `req.protocol` reflect the forwarded request,
+- sends `X-Accel-Buffering: no` on the SSE stream so progress events flush
+  through nginx without extra config,
+- binds `0.0.0.0` and only `expose`s port 4000 — **do not** add a `ports:`
+  mapping; put the container on a shared network with the nginx container
+  (e.g. `networks: [docsend2pdf.net]` on the nginx side too) and proxy by
+  service name.
+
+Reference nginx server block (adjust `server_name` and the proxy host to your
+setup — `<container-name>:4000` works when nginx shares the compose network):
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name docsend.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/docsend.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/docsend.example.com/privkey.pem;
+
+    # Match the app's MAX_FILE_SIZE_BYTES (50 MB), otherwise nginx
+    # rejects uploads with 413 at its 1 MB default.
+    client_max_body_size 50m;
+
+    # Optional: also keep the app's long conversions from being cut off.
+    # Downloads/uploads are fine, but raise these if jobs exceed 60s of
+    # silence on the SSE stream.
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+
+    location / {
+        proxy_pass http://app:4000;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Needed for SSE /api/events/:id if you prefer buffering off here
+        # instead of relying on the app's X-Accel-Buffering header:
+        # proxy_buffering off;
+    }
+}
+
+server {
+    listen 80;
+    server_name docsend.example.com;
+    return 301 https://$host$request_uri;
+}
+```
+
+Notes:
+- The `/api/events/:id` SSE stream needs `proxy_http_version 1.1` + no
+  buffering (the app's `X-Accel-Buffering: no` header covers the latter).
+- Keep `Upgrade`/`Connection` header handling simple — there is no WebSocket
+  usage, so the standard headers above are sufficient.
+- The Docker healthcheck already targets `127.0.0.1:4000`, so it is unaffected
+  by the proxy.
+
 ## API Endpoints
 
 | Method | Path | Description |
