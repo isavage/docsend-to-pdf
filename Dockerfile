@@ -21,7 +21,7 @@ RUN apt-get update && \
 # ---------- Backend ----------
 FROM base AS backend-build
 WORKDIR /app
-COPY backend/package.json backend/tsconfig.json ./
+COPY backend/package.json backend/package-lock.json backend/tsconfig.json ./
 RUN npm ci
 COPY backend/src ./src
 RUN npm run build
@@ -29,11 +29,12 @@ RUN npm run build
 # ---------- Frontend ----------
 FROM node:20-alpine AS frontend-build
 WORKDIR /app
-COPY frontend/package.json frontend/tsconfig.json frontend/vite.config.ts ./
-RUN npm ci --omit=dev 2>/dev/null; npm ci || true
-COPY frontend/index.html frontend/tailwind.config.js frontend/postcss.config.js ./
+COPY frontend/package.json frontend/package-lock.json ./
+# Dev deps (vite, typescript, @vitejs/plugin-react, tailwind) are required to build.
+RUN npm ci
+COPY frontend/tsconfig.json frontend/vite.config.ts frontend/index.html frontend/tailwind.config.js frontend/postcss.config.js ./
 COPY frontend/src ./src
-RUN npm run build || npx vite build
+RUN npm run build
 
 # ---------- Runtime ----------
 FROM base
