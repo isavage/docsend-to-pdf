@@ -30,7 +30,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           user: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_SSH_PORT || 2222 }}
+          port: 2222
           # Defaults to /docker/<repo-name> -> /docker/docsend-to-pdf
           target_dir: /docker/docsend-to-pdf
           compose_file: docker-compose.yml

@@ -215,5 +215,9 @@ export class DocSendConverter {
 
 async function defaultLaunchBrowser(): Promise<Browser> {
   const { chromium } = await import('playwright');
-  return chromium.launch({ headless: true });
+  return chromium.launch({
+    headless: true,
+    executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
+    args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+  });
 }

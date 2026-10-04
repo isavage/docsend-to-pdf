@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { DocSendConverter } from '../src/services/converter.js';
-import type { ConversionRequest, ConversionJob } from '../src/types.js';
+import { DocSendConverter } from '../services/converter.js';
+import type { ConversionRequest, ConversionJob } from '../types.js';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs/promises';
 import path from 'path';
@@ -36,7 +36,11 @@ async function processJob(jobId: string, request: ConversionRequest) {
 
     const browserFactory = async () => {
       const { chromium } = await import('playwright');
-      return chromium.launch({ headless: true });
+      return chromium.launch({
+        headless: true,
+        executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
+        args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      });
     };
 
     const resultJob = await converter.convert(request, { launchBrowser: browserFactory, onProgress });

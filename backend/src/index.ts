@@ -32,7 +32,9 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Serve frontend for single-page app (fallback)
-const distPath = path.join(__dirname, '..', '..', 'frontend', 'dist');
+// Runtime layout: /app/dist/index.js + /app/frontend/dist (see Dockerfile),
+// so the frontend build lives one level above __dirname, not two.
+const distPath = path.join(__dirname, '..', 'frontend', 'dist');
 try {
   await fs.access(distPath);
   app.use(express.static(distPath));
