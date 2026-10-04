@@ -39,6 +39,8 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/tsconfig.json frontend/vite.config.ts frontend/index.html frontend/tailwind.config.js frontend/postcss.config.js ./
 COPY frontend/src ./src
+# public/ holds static assets (favicon.svg etc.) that Vite copies into dist.
+COPY frontend/public ./public
 RUN npm run build
 
 # ---------- Runtime ----------
