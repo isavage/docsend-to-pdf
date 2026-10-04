@@ -10,7 +10,13 @@ export const CONFIG = {
   outputDir: process.env.OUTPUT_DIR ?? '/app/output',
   browserTimeoutMs: Number(process.env.BROWSER_TIMEOUT_MS ?? 60_000),
   slideWaitMs: Number(process.env.SLIDE_WAIT_MS ?? 2000),
-  emailEnabled: process.env.EMAIL_ENABLED === 'true',
+  // EMAIL_ENABLED=true is only honoured when a real SMTP host is set. Without
+  // one, nodemailer would dial 127.0.0.1:587 and fail — signups would create
+  // stuck-unverified users. Empty host => behave as if email is disabled
+  // (auto-verify at signup, log the verification link instead).
+  emailEnabled:
+    process.env.EMAIL_ENABLED === 'true' &&
+    (process.env.SMTP_HOST ?? '').trim() !== '',
   smtpHost: process.env.SMTP_HOST ?? '',
   smtpPort: Number(process.env.SMTP_PORT ?? 587),
   smtpUser: process.env.SMTP_USER ?? '',
@@ -33,4 +39,12 @@ export const CONFIG = {
 
 export function getMaxSlidesForTier(tier: Tier): number {
   return tier === 'member' ? CONFIG.memberTierMaxSlides : CONFIG.freeTierMaxSlides;
+}
+
+if (process.env.EMAIL_ENABLED === 'true' && (process.env.SMTP_HOST ?? '').trim() === '') {
+  console.warn(
+    '[config] EMAIL_ENABLED=true but SMTP_HOST is empty — email sending is DISABLED. ' +
+      'Signups will be auto-verified (member tier) and verification links logged. ' +
+      'Set SMTP_HOST/PORT/USER/PASS to send real emails.',
+  );
 }

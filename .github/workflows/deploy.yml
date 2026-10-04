@@ -31,6 +31,10 @@ jobs:
           user: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 2222
+          # Doppler service token (dp.st...): the action runs
+          # "doppler run -- docker compose ..." so the compose file's
+          # ${SMTP_HOST}, ${GOOGLE_CLIENT_ID}, etc. interpolate from Doppler.
+          doppler_token: ${{ secrets.DOPPLER_TOKEN }}
           # Defaults to /docker/<repo-name> -> /docker/docsend-to-pdf
           target_dir: /docker/docsend-to-pdf
           compose_file: docker-compose.yml

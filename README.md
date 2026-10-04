@@ -164,8 +164,8 @@ Notes:
 | `PUBLIC_URL` | `http://localhost:4000` | Public origin; used in email verification links and the post-Google redirect. Production: `https://docsend-to-pdf.online` |
 | `GOOGLE_CLIENT_ID` | `` | OAuth 2.0 client ID (Google Cloud Console → Credentials). Empty hides the Google button. |
 | `GOOGLE_CLIENT_SECRET` | `` | Matching OAuth client secret |
-| `EMAIL_ENABLED` | `false` | `true` requires SMTP below; otherwise signup auto-verifies and the verify link is logged to stdout (dev mode) |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | `` / `587` / `` / `` | SMTP relay for verification emails |
+| `EMAIL_ENABLED` | `false` | `true` **and** a non-empty `SMTP_HOST` enables real emails. Otherwise signup auto-verifies (member tier) and the verify link is logged to stdout — the backend also prints a startup warning if `EMAIL_ENABLED=true` but `SMTP_HOST` is empty. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | `` / `587` / `` / `` | SMTP relay for verification emails. Without `SMTP_HOST`, nodemailer would dial `127.0.0.1:587` and fail — that's why an empty host disables sending. |
 | `FROM_ADDRESS` | `noreply@docsend-to-pdf.online` | From address on verification emails |
 
 Google OAuth setup: create an **OAuth client ID (Web application)** at
@@ -183,6 +183,30 @@ dev).
   verification link (the UI shows a "verify your email" banner).
 - The tier is computed server-side per request from the session cookie; the
   `POST /api/convert` body no longer accepts a `tier` field at all.
+
+## Deployment / Environment Injection
+
+The GitHub Actions deploy (`.github/workflows/deploy.yml`) uses
+`isavage/deploy@v3` against the VPS at `/docker/docsend-to-pdf`, building the
+image on the server from source.
+
+Secrets come from **Doppler**: the workflow passes
+`doppler_token: ${{ secrets.DOPPLER_TOKEN }}` to the action, which runs
+`doppler run -- docker compose ...` on the VPS. This is the only way the
+compose file's `${SMTP_HOST}`, `${GOOGLE_CLIENT_ID}`, `${EMAIL_ENABLED}`, etc.
+get real values — Doppler does **not** auto-inject into containers.
+
+Requirements for this to work:
+
+1. The `DOPPLER_TOKEN` secret (a `dp.st...` **service token**) must exist in
+   the GitHub Environment the job uses (`prod-IN`). Without it, every `${VAR}`
+   falls back to its compose default (empty), and emails silently fail with
+   `connect ECONNREFUSED 127.0.0.1:587`.
+2. Doppler must contain variables with the **exact names** used in
+   `docker-compose.yml` (e.g. `SMTP_HOST`, not `smtp_host` or
+   `SMTP_SERVER`).
+3. `docker-compose.yml` must reference each variable explicitly (it does) —
+   Doppler mode never writes a `.env` file on disk.
 
 ## Tech Stack
 
