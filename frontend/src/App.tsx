@@ -109,7 +109,7 @@ export default function App() {
           <nav className="hidden md:flex gap-8 text-sm text-gray-600">
             <a href="#" className="hover:text-gray-900 transition-colors">Features</a>
             <a href="#pricing" className="hover:text-gray-900 transition-colors">Pricing</a>
-            <a href="https://github.com" target="_blank" rel="noreferrer" className="hover:text-gray-900 transition-colors">GitHub</a>
+            <a href="https://github.com/isavage/docsend-to-pdf" target="_blank" rel="noreferrer" className="hover:text-gray-900 transition-colors">GitHub</a>
           </nav>
 
           {auth.user ? (
