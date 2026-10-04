@@ -120,6 +120,9 @@ router.post('/logout', (req: Request, res: Response) => {
 router.get('/verify', (req: Request, res: Response) => {
   const token = String(req.query.token ?? '');
   const user = token ? consumeVerifyToken(token) : null;
+  // consumeVerifyToken only resolves the token — persist the verification on
+  // the user row, otherwise the SPA keeps showing the "verify your email" banner.
+  if (user) markEmailVerified(user.id);
   res.status(user ? 200 : 400).type('html').send(`<!doctype html><meta charset="utf-8">
 <title>Email verification</title>
 <body style="font-family:-apple-system,system-ui,sans-serif;max-width:480px;margin:15vh auto;text-align:center;padding:0 24px">
