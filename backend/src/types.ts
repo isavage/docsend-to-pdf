@@ -1,4 +1,12 @@
-export type Tier = 'free' | 'paid';
+export type Tier = 'free' | 'member';
+
+// Identity attached to each request by the session middleware.
+// 'free' = anonymous visitor, 'member' = any signed-in (and verified) user.
+export interface Viewer {
+  tier: Tier;
+  userId?: string;
+  email?: string;
+}
 
 export interface ConversionJob {
   id: string;

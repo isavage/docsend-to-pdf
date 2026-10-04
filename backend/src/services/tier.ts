@@ -11,8 +11,13 @@ export class TierLimitError extends Error {
 export function assertTierAllowsSlides(tier: Tier, slideCount: number): void {
   const max = getMaxSlidesForTier(tier);
   if (slideCount > max) {
+    if (tier === 'free') {
+      throw new TierLimitError(
+        `Free conversions are limited to ${max} slides. This document has ${slideCount} slides. Sign in to unlock up to ${CONFIG.memberTierMaxSlides} slides per conversion.`
+      );
+    }
     throw new TierLimitError(
-      `${tier} tier is limited to ${max} slides. This document has ${slideCount} slides. Upgrade to paid for unlimited conversions.`
+      `Member conversions are limited to ${max} slides. This document has ${slideCount} slides.`
     );
   }
 }
@@ -37,8 +42,8 @@ export function formatBytes(bytes: number): string {
 
 export function createUpsellMessage(job: ConversionJob): string {
   const max = getMaxSlidesForTier(job.tier);
-  if (job.tier === 'paid') {
-    return 'Thank you for being a paid subscriber. Your conversion includes unlimited slides and batch delivery.';
+  if (job.tier === 'member') {
+    return `Signed-in members can convert up to ${max} slides per document.`;
   }
-  return `Free tier conversions are capped at ${max} slides. Upgrade to unlock unlimited slides, batch conversion, and email delivery plus AI pitch-deck analysis.`;
+  return `Free conversions are capped at ${max} slides. Sign in to unlock up to ${CONFIG.memberTierMaxSlides} slides per conversion.`;
 }

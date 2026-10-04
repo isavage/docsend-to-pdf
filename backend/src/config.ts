@@ -6,7 +6,7 @@ export const CONFIG = {
   uploadsDir: process.env.UPLOADS_DIR ?? '/app/uploads',
   maxFileSizeBytes: Number(process.env.MAX_FILE_SIZE_BYTES ?? 50 * 1024 * 1024), // 50 MB
   freeTierMaxSlides: Number(process.env.FREE_TIER_MAX_SLIDES ?? 10),
-  paidTierMaxSlides: Number(process.env.PAID_TIER_MAX_SLIDES ?? 1000),
+  memberTierMaxSlides: Number(process.env.MEMBER_TIER_MAX_SLIDES ?? 1000),
   outputDir: process.env.OUTPUT_DIR ?? '/app/output',
   browserTimeoutMs: Number(process.env.BROWSER_TIMEOUT_MS ?? 60_000),
   slideWaitMs: Number(process.env.SLIDE_WAIT_MS ?? 2000),
@@ -16,8 +16,21 @@ export const CONFIG = {
   smtpUser: process.env.SMTP_USER ?? '',
   smtpPass: process.env.SMTP_PASS ?? '',
   fromAddress: process.env.FROM_ADDRESS ?? 'noreply@docsendpdf.dev',
+
+  // ---- Auth ----
+  dbPath: process.env.DB_PATH ?? '/app/data/app.db',
+  sessionTtlMs: Number(process.env.SESSION_TTL_MS ?? 30 * 24 * 3600_000), // 30 days
+  cookieName: process.env.COOKIE_NAME ?? 'ds_session',
+  // Set true when served over HTTPS (behind nginx). Cookie is __Host-secure.
+  cookieSecure: process.env.COOKIE_SECURE === 'true',
+  // Public origin used to build email verification links, e.g. https://docsend-to-pdf.online
+  publicUrl: process.env.PUBLIC_URL ?? 'http://localhost:4000',
+  googleClientId: process.env.GOOGLE_CLIENT_ID ?? '',
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+  // Google OAuth redirect must match the value configured in Google Cloud.
+  googleRedirectPath: '/api/auth/google/callback',
 };
 
 export function getMaxSlidesForTier(tier: Tier): number {
-  return tier === 'paid' ? CONFIG.paidTierMaxSlides : CONFIG.freeTierMaxSlides;
+  return tier === 'member' ? CONFIG.memberTierMaxSlides : CONFIG.freeTierMaxSlides;
 }

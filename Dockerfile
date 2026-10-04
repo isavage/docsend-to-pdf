@@ -21,6 +21,11 @@ RUN apt-get update && \
 # ---------- Backend ----------
 FROM base AS backend-build
 WORKDIR /app
+# Build toolchain for native modules (better-sqlite3 ships prebuilds for
+# node20/linux-x64, but this guarantees a source fallback if one is ever missing).
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3 make g++ && \
+    rm -rf /var/lib/apt/lists/*
 COPY backend/package.json backend/package-lock.json backend/tsconfig.json ./
 RUN npm ci
 COPY backend/src ./src
@@ -44,7 +49,8 @@ COPY --from=backend-build /app/dist ./dist
 COPY --from=backend-build /app/node_modules ./node_modules
 COPY --from=frontend-build /app/dist ./frontend/dist
 
-RUN mkdir -p /app/uploads /app/output
+RUN mkdir -p /app/uploads /app/output /app/data && \
+    chown -R node:node /app/uploads /app/output /app/data
 USER node
 
 EXPOSE 4000

@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import './index.css';
+import { AuthModal } from './AuthModal';
+import { useAuth } from './auth';
 
 interface ConversionJob {
   id: string;
   url: string;
   password?: string;
-  tier: 'free' | 'paid';
+  tier: 'free' | 'member';
   email?: string;
   status: string;
   progress: number;
@@ -17,14 +19,26 @@ interface ConversionJob {
 }
 
 export default function App() {
+  const auth = useAuth();
   const [url, setUrl] = useState('');
   const [password, setPassword] = useState('');
-  const [tier, setTier] = useState<'free' | 'paid'>('free');
   const [email, setEmail] = useState('');
   const [job, setJob] = useState<ConversionJob | null>(null);
   const [error, setError] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<{ score: number; strengths: string[]; weaknesses: string[] } | null>(null);
+  const [authModal, setAuthModal] = useState<null | 'login' | 'signup'>(null);
+
+  // After the Google OAuth redirect we land on `/?signedin=1` — refresh state
+  // (the session cookie is already set) and clean up the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('signedin') === '1') {
+      void auth.refresh();
+      window.history.replaceState({}, '', '/');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,7 +48,7 @@ export default function App() {
       const res = await fetch('/api/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, password: password || undefined, tier, email: email || undefined }),
+        body: JSON.stringify({ url, password: password || undefined, email: email || undefined }),
       });
       const data = await res.json();
       if (data.error) return setError(data.error);
@@ -97,9 +111,43 @@ export default function App() {
             <a href="#pricing" className="hover:text-gray-900 transition-colors">Pricing</a>
             <a href="https://github.com" target="_blank" rel="noreferrer" className="hover:text-gray-900 transition-colors">GitHub</a>
           </nav>
-          <button className="px-4 py-2 bg-[#635bff] text-white text-sm font-medium rounded-full hover:bg-[#5048e7] transition-colors">
-            Sign Up
-          </button>
+
+          {auth.user ? (
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
+                <span className="w-7 h-7 rounded-full bg-[#635bff]/10 text-[#635bff] flex items-center justify-center text-xs font-semibold">
+                  {(auth.user.name || auth.user.email || '?')[0].toUpperCase()}
+                </span>
+                {auth.user.name || auth.user.email}
+              </span>
+              {auth.user.emailVerified ? (
+                <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-green-50 text-green-700">Member · {auth.config.memberTierMaxSlides} slides</span>
+              ) : (
+                <VerifyBanner onResend={auth.resendVerification} />
+              )}
+              <button
+                onClick={() => void auth.logout()}
+                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
+              >
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setAuthModal('login')}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                Sign in
+              </button>
+              <button
+                onClick={() => setAuthModal('signup')}
+                className="px-4 py-2 bg-[#635bff] text-white text-sm font-medium rounded-full hover:bg-[#5048e7] transition-colors"
+              >
+                Sign up free
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -146,14 +194,20 @@ export default function App() {
               onChange={e => setEmail(e.target.value)}
               className="flex-1 px-4 py-2.5 text-xs bg-white/60 border border-gray-100 rounded-lg outline-none focus:border-[#635bff]/40 text-gray-700 placeholder-gray-400"
             />
-            <select
-              value={tier}
-              onChange={e => setTier(e.target.value as 'free' | 'paid')}
-              className="px-3 py-2.5 text-xs bg-white/60 border border-gray-100 rounded-lg outline-none text-gray-500 cursor-pointer"
-            >
-              <option value="free">Free</option>
-              <option value="paid">Paid</option>
-            </select>
+            <span className="px-3 py-2.5 text-xs bg-white/60 border border-gray-100 rounded-lg text-gray-500 whitespace-nowrap">
+              {auth.tier === 'member'
+                ? `Member limit: ${auth.config.memberTierMaxSlides} slides`
+                : `Free limit: ${auth.config.freeTierMaxSlides} slides`}
+              {auth.tier !== 'member' && (
+                <button
+                  type="button"
+                  onClick={() => setAuthModal('signup')}
+                  className="ml-1 text-[#635bff] font-medium hover:underline"
+                >
+                  Sign in for more
+                </button>
+              )}
+            </span>
           </div>
 
           {error && (
@@ -196,7 +250,17 @@ export default function App() {
               </div>
             )}
             {job.status === 'failed' && job.error && (
-              <p className="text-sm text-red-600">{job.error}</p>
+              <div className="space-y-3">
+                <p className="text-sm text-red-600">{job.error}</p>
+                {job.error.includes('limited to') && auth.tier !== 'member' && (
+                  <button
+                    onClick={() => setAuthModal(auth.user ? 'login' : 'signup')}
+                    className="block w-full py-2.5 bg-[#635bff] text-white text-sm font-medium rounded-xl hover:bg-[#5048e7] transition-all"
+                  >
+                    {auth.user ? 'Verify your email to unlock' : 'Sign in — convert up to 1,000 slides'}
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </section>
@@ -240,12 +304,14 @@ export default function App() {
                 )}
               </div>
             )}
-            <a
-              href="#pricing"
-              className="mt-4 block w-full py-2.5 border border-[#635bff] text-[#635bff] text-sm font-medium rounded-xl text-center hover:bg-[#635bff] hover:text-white transition-all"
-            >
-              Unlock full AI analysis →
-            </a>
+            {!auth.user?.emailVerified && (
+              <a
+                href="#pricing"
+                className="mt-4 block w-full py-2.5 border border-[#635bff] text-[#635bff] text-sm font-medium rounded-xl text-center hover:bg-[#635bff] hover:text-white transition-all"
+              >
+                Sign in for full access →
+              </a>
+            )}
           </div>
         </section>
       )}
@@ -267,61 +333,56 @@ export default function App() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="max-w-5xl mx-auto px-6 py-20">
-        <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">Simple pricing</h2>
-        <p className="text-center text-gray-500 text-sm mb-12">Start free. Upgrade when you need more.</p>
-        <div className="grid md:grid-cols-3 gap-6">
+      {/* Pricing — free vs member (no payment) */}
+      <section id="pricing" className="max-w-4xl mx-auto px-6 py-20">
+        <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">Free for light use, generous for members</h2>
+        <p className="text-center text-gray-500 text-sm mb-12">Sign in with Google or email — no credit card, no payment.</p>
+        <div className="grid md:grid-cols-2 gap-6">
           {/* Free */}
           <div className="pricing-card bg-white border border-gray-200 rounded-2xl p-6 transition-all">
             <h3 className="font-semibold text-gray-900">Free</h3>
-            <p className="text-3xl font-bold mt-2">$0<span className="text-sm font-normal text-gray-400">/mo</span></p>
+            <p className="text-3xl font-bold mt-2">$0<span className="text-sm font-normal text-gray-400">/forever</span></p>
             <ul className="mt-6 space-y-2 text-sm text-gray-600">
-              <li>✓ Up to 10 slides per conversion</li>
+              <li>✓ Up to {auth.config.freeTierMaxSlides} slides per conversion</li>
+              <li>✓ No account required</li>
               <li>✓ Standard quality PDF</li>
               <li>✓ Direct download</li>
-              <li>✗ No batch conversions</li>
-              <li>✗ No email delivery</li>
-              <li>✗ No AI analysis</li>
             </ul>
-            <button className="mt-8 w-full py-2.5 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors">
-              Start Free
-            </button>
+            <a
+              href="#top"
+              className="mt-8 block w-full py-2.5 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors text-center"
+            >
+              Start above — no sign-up
+            </a>
           </div>
-          {/* Pro - highlighted */}
+          {/* Member - highlighted */}
           <div className="pricing-card bg-white border-2 border-[#635bff] rounded-2xl p-6 relative transition-all shadow-lg shadow-[#635bff]/5">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-[#635bff] text-white text-xs font-medium rounded-full">
-              Most Popular
+              Best for big decks
             </div>
-            <h3 className="font-semibold text-gray-900">Pro</h3>
-            <p className="text-3xl font-bold mt-2">$12<span className="text-sm font-normal text-gray-400">/mo</span></p>
+            <h3 className="font-semibold text-gray-900">Member</h3>
+            <p className="text-3xl font-bold mt-2">Free<span className="text-sm font-normal text-gray-400"> with sign-in</span></p>
             <ul className="mt-6 space-y-2 text-sm text-gray-600">
-              <li>✓ Unlimited slides</li>
-              <li>✓ High-quality PDF</li>
-              <li>✓ Email delivery</li>
-              <li>✓ Batch conversions</li>
-              <li>✓ AI pitch-deck analysis</li>
-              <li>✓ Priority support</li>
+              <li>✓ Up to {auth.config.memberTierMaxSlides.toLocaleString()} slides per conversion</li>
+              <li>✓ Google or email sign-in</li>
+              <li>✓ Email delivery of your PDFs</li>
+              <li>✓ Full pitch-deck analysis</li>
             </ul>
-            <button className="mt-8 w-full py-2.5 bg-[#635bff] text-white text-sm font-medium rounded-xl hover:bg-[#5048e7] transition-colors">
-              Get Pro
-            </button>
-          </div>
-          {/* Enterprise */}
-          <div className="pricing-card bg-white border border-gray-200 rounded-2xl p-6 transition-all">
-            <h3 className="font-semibold text-gray-900">Team</h3>
-            <p className="text-3xl font-bold mt-2">$39<span className="text-sm font-normal text-gray-400">/mo</span></p>
-            <ul className="mt-6 space-y-2 text-sm text-gray-600">
-              <li>✓ Everything in Pro</li>
-              <li>✓ API access</li>
-              <li>✓ SSO / SAML</li>
-              <li>✓ Audit logs</li>
-              <li>✓ Dedicated account manager</li>
-              <li>✓ Custom SLAs</li>
-            </ul>
-            <button className="mt-8 w-full py-2.5 border border-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors">
-              Contact Sales
-            </button>
+            {auth.user?.emailVerified ? (
+              <button
+                disabled
+                className="mt-8 w-full py-2.5 bg-green-50 text-green-700 text-sm font-medium rounded-xl cursor-default"
+              >
+                ✓ You're a member
+              </button>
+            ) : (
+              <button
+                onClick={() => setAuthModal('signup')}
+                className="mt-8 w-full py-2.5 bg-[#635bff] text-white text-sm font-medium rounded-xl hover:bg-[#5048e7] transition-colors"
+              >
+                {auth.user ? 'Verify your email' : 'Sign up free'}
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -337,6 +398,28 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      <AuthModal
+        key={authModal ?? 'closed'}
+        open={authModal !== null}
+        initialMode={authModal ?? 'signup'}
+        onClose={() => setAuthModal(null)}
+      />
     </div>
+  );
+}
+
+function VerifyBanner({ onResend }: { onResend: () => Promise<string | null> }) {
+  const [sent, setSent] = useState(false);
+  return (
+    <span className="flex items-center gap-2 text-[11px] font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700">
+      Verify your email to unlock member limits
+      <button
+        onClick={() => void onResend().then((e) => !e && setSent(true))}
+        className="underline hover:no-underline"
+      >
+        {sent ? 'Sent ✓' : 'Resend link'}
+      </button>
+    </span>
   );
 }

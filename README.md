@@ -8,7 +8,7 @@ Turn any DocSend presentation link into a pixel-perfect PDF — no plugins requi
 - **Password-protected links** — Enter the DocSend password and the converter handles auth automatically.
 - **Expiration & view-only checks** — Fails fast with clear messages for expired links or restricted documents.
 - **Progress tracking** — Real-time progress bar via Server-Sent Events (SSE).
-- **Tier system** — Free tier: 10 slides max. Paid tier: unlimited + batch conversions + email delivery.
+- **Free / Member tiers** — Anonymous visitors get 10 slides per conversion. Signed-in members (Google OAuth or email + password, with verified email) get up to 1,000 slides. Tier is derived server-side from the session — it can't be forged from the client. No payment required.
 - **File size limit** — Configurable cap (default 50 MB).
 - **AI pitch-deck analysis** — Post-conversion upsell: auto-analyze pitch decks for strengths, weaknesses, and a scoring rubric.
 
@@ -130,6 +130,15 @@ Notes:
 | GET    | `/api/download/:id` | Download the generated PDF |
 | POST   | `/api/pitch-deck/analyze` | AI analysis of converted deck |
 | GET    | `/api/health` | Health check |
+| GET    | `/api/auth/config` | Public auth config (Google enabled, limits) |
+| GET    | `/api/auth/me` | Current user + derived tier |
+| POST   | `/api/auth/signup` | Create email/password account |
+| POST   | `/api/auth/login` | Sign in with email/password |
+| POST   | `/api/auth/logout` | Sign out (clears session) |
+| GET    | `/api/auth/verify?token=` | Email verification link target |
+| POST   | `/api/auth/resend-verification` | Re-send the verification email |
+| GET    | `/api/auth/google` | Start Google OAuth sign-in |
+| GET    | `/api/auth/google/callback` | OAuth redirect target |
 
 ## Environment Variables
 
@@ -138,12 +147,40 @@ Notes:
 | `PORT` | `4000` | Server port |
 | `HOST` | `0.0.0.0` | Bind address |
 | `MAX_FILE_SIZE_BYTES` | `52428800` | Output file cap (50 MB) |
-| `FREE_TIER_MAX_SLIDES` | `10` | Slides allowed for free users |
-| `PAID_TIER_MAX_SLIDES` | `1000` | Slides allowed for paid users |
+| `FREE_TIER_MAX_SLIDES` | `10` | Slides allowed for anonymous visitors |
+| `MEMBER_TIER_MAX_SLIDES` | `1000` | Slides allowed for verified members |
 | `BROWSER_TIMEOUT_MS` | `60000` | Browser navigation timeout |
 | `SLIDE_WAIT_MS` | `2000` | Pause between slide captures |
-| `EMAIL_ENABLED` | `false` | Enable email delivery |
-| `SMTP_HOST` | `` | SMTP relay host |
+
+### Auth / accounts
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_PATH` | `/app/data/app.db` | SQLite file (users/sessions/tokens). Keep it on a volume. |
+| `SESSION_TTL_MS` | `2592000000` | Session lifetime (30 days) |
+| `COOKIE_NAME` | `ds_session` | Session cookie name |
+| `COOKIE_SECURE` | `false` | Set `true` behind HTTPS nginx so the cookie is Secure-only |
+| `PUBLIC_URL` | `http://localhost:4000` | Public origin; used in email verification links and the post-Google redirect |
+| `GOOGLE_CLIENT_ID` | `` | OAuth 2.0 client ID (Google Cloud Console → Credentials). Empty hides the Google button. |
+| `GOOGLE_CLIENT_SECRET` | `` | Matching OAuth client secret |
+| `EMAIL_ENABLED` | `false` | `true` requires SMTP below; otherwise signup auto-verifies and the verify link is logged to stdout (dev mode) |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | `` / `587` / `` / `` | SMTP relay for verification emails |
+| `FROM_ADDRESS` | `noreply@docsendpdf.dev` | From address on verification emails |
+
+Google OAuth setup: create an **OAuth client ID (Web application)** at
+console.cloud.google.com → APIs & Services → Credentials, and add
+`https://<your-domain>/api/auth/google/callback` under *Authorized redirect
+URIs* (plus `http://localhost:4000/api/auth/google/callback` for local dev).
+
+## Tiers
+
+- **free** — anonymous, no cookie. Cap: `FREE_TIER_MAX_SLIDES` (10).
+- **member** — signed in (Google or email+password) **and** email verified.
+  Cap: `MEMBER_TIER_MAX_SLIDES` (1,000).
+- A signed-in but unverified user is treated as **free** until they click the
+  verification link (the UI shows a "verify your email" banner).
+- The tier is computed server-side per request from the session cookie; the
+  `POST /api/convert` body no longer accepts a `tier` field at all.
 
 ## Tech Stack
 

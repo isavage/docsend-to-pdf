@@ -17,12 +17,12 @@ describe('assertTierAllowsSlides', () => {
     expect(() => assertTierAllowsSlides('free', 11)).toThrow(TierLimitError);
   });
 
-  it('allows paid tier up to 1000 slides', () => {
-    expect(() => assertTierAllowsSlides('paid', 1000)).not.toThrow();
+  it('allows member tier up to 1000 slides', () => {
+    expect(() => assertTierAllowsSlides('member', 1000)).not.toThrow();
   });
 
-  it('rejects paid tier above 1000 slides', () => {
-    expect(() => assertTierAllowsSlides('paid', 1001)).toThrow(TierLimitError);
+  it('rejects member tier above 1000 slides', () => {
+    expect(() => assertTierAllowsSlides('member', 1001)).toThrow(TierLimitError);
   });
 });
 
@@ -63,15 +63,15 @@ describe('createUpsellMessage', () => {
       updatedAt: new Date(),
     };
     const msg = createUpsellMessage(job);
-    expect(msg).toContain('Free tier conversions are capped at 10 slides');
-    expect(msg).toContain('Upgrade');
+    expect(msg).toContain('Free conversions are capped at 10 slides');
+    expect(msg).toContain('Sign in');
   });
 
-  it('returns thank-you for paid tier job', () => {
+  it('returns member note for member tier job', () => {
     const job: ConversionJob = {
       id: '2',
       url: 'https://docsend.com/view/abc',
-      tier: 'paid',
+      tier: 'member',
       status: 'completed',
       progress: 100,
       capturedSlides: 50,
@@ -79,6 +79,6 @@ describe('createUpsellMessage', () => {
       updatedAt: new Date(),
     };
     const msg = createUpsellMessage(job);
-    expect(msg).toContain('paid subscriber');
+    expect(msg).toContain('Signed-in members can convert up to 1000 slides');
   });
 });

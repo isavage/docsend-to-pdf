@@ -12,10 +12,11 @@ const router = Router();
 // In-memory store for active jobs
 export const jobStore: Map<string, ConversionJob> = new Map();
 
+// NOTE: `tier` is intentionally NOT part of the request body — it is derived
+// server-side from the authenticated session (see req.viewer.tier below).
 const convertSchema = z.object({
   url: z.string(),
   password: z.string().optional(),
-  tier: z.enum(['free', 'paid']).default('free'),
   email: z.string().email().optional(),
 });
 
@@ -59,12 +60,15 @@ router.post('/convert', async (req, res) => {
     const jobId = uuidv4();
     const now = new Date();
 
+    // Tier comes from the verified session, never from the client.
+    const tier = req.viewer.tier;
+
     const job: ConversionJob = {
       id: jobId,
       url: body.url,
       password: body.password,
-      tier: body.tier,
-      email: body.email,
+      tier,
+      email: body.email ?? req.viewer.email,
       status: 'pending',
       progress: 0,
       capturedSlides: 0,
@@ -74,8 +78,8 @@ router.post('/convert', async (req, res) => {
 
     jobStore.set(jobId, job);
 
-    // Start background conversion
-    void processJob(jobId, body);
+    // Start background conversion (tier + email resolved server-side).
+    void processJob(jobId, { url: body.url, password: body.password, tier, email: job.email });
 
     res.json({ jobId, status: 'pending' });
   } catch {
@@ -166,7 +170,10 @@ pitchDeckAnalysisRouter.post('/analyze', async (req, res) => {
         'Call-to-action could be more prominent',
       ],
     },
-    upsellNote: 'Full AI analysis with deep-dive feedback requires a paid plan.',
+    upsellNote:
+      req.viewer.tier === 'member'
+        ? undefined
+        : 'Sign in free to unlock full AI analysis and 1,000-slide conversions.',
   });
 });
 

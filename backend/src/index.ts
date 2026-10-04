@@ -1,6 +1,11 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import apiRoutes from './api/routes.js';
+import authRoutes from './api/auth.js';
+import { attachViewer } from './middleware.js';
+import { getDb } from './db.js';
+import { purgeExpired } from './services/auth.js';
 import { CONFIG } from './config.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -16,12 +21,24 @@ const app = express();
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '50mb' }));
+app.use(cookieParser());
+
+// Derive the request's tier from the session cookie (free vs member).
+app.use(attachViewer);
+
+// Open the SQLite database (creates tables on first run) and periodically
+// purge expired sessions/tokens.
+getDb();
+setInterval(purgeExpired, 3600_000).unref();
 
 // Ensure output directory exists
 await fs.mkdir(CONFIG.outputDir, { recursive: true });
 await fs.mkdir(CONFIG.uploadsDir, { recursive: true });
+
+// Auth routes (must be before the SPA fallback)
+app.use('/api/auth', authRoutes);
 
 // API routes
 app.use('/api', apiRoutes);
