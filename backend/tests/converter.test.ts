@@ -35,6 +35,7 @@ function createLocator(overrides: Record<string, unknown> = {}) {
     count: vi.fn().mockResolvedValue(0),
     fill: vi.fn().mockResolvedValue(undefined),
     click: vi.fn().mockResolvedValue(undefined),
+    press: vi.fn().mockResolvedValue(undefined),
     screenshot: vi.fn().mockResolvedValue(mockSlideImage),
     first: vi.fn().mockReturnThis(),
     ...overrides,
@@ -53,6 +54,8 @@ function createMockPage(overrides: Record<string, unknown> = {}) {
     evaluate: vi.fn().mockResolvedValue(0),
     url: vi.fn().mockReturnValue('https://docsend.com/view/abc'),
     setViewportSize: vi.fn().mockResolvedValue(undefined),
+    // captureSlides screenshots the whole viewport (not a slide element).
+    screenshot: vi.fn().mockResolvedValue(mockSlideImage),
     ...overrides,
   };
 }
@@ -111,16 +114,15 @@ describe('DocSendConverter', () => {
   });
 
   it('detects password gate when no password provided', async () => {
-    // The converter calls locator() multiple times: view-only, expired, then password input.
-    // view-only → invisible, expired → invisible, password → visible
-    const viewOnlyLocator = createLocator({ isVisible: vi.fn().mockResolvedValue(false) });
-    const expiredLocator = createLocator({ isVisible: vi.fn().mockResolvedValue(false) });
+    // The converter calls locator() in order: expired, view-only, cookie
+    // banner, email gate input, cookie banner (again), then password input.
+    const invisible = () => createLocator({ isVisible: vi.fn().mockResolvedValue(false) });
     const pwdLocator = createLocator({ isVisible: vi.fn().mockResolvedValue(true) });
     let callCount = 0;
     const page = createMockPage({
       locator: vi.fn().mockImplementation(() => {
         callCount++;
-        return callCount === 1 ? viewOnlyLocator : callCount === 2 ? expiredLocator : pwdLocator;
+        return callCount <= 5 ? invisible() : pwdLocator;
       }),
     });
     const browser = createMockBrowser(page);
@@ -139,13 +141,14 @@ describe('DocSendConverter', () => {
     const pwdLocator = createLocator({ isVisible: vi.fn().mockResolvedValue(true), fill });
     const screenshot = vi.fn().mockResolvedValue(mockSlideImage);
     const slideLocator = createLocator({ count: vi.fn().mockResolvedValue(1), screenshot, click: submitClick });
-    // Flow: view-only(loc1) → expired(loc2) → password(loc3=pwd) → submit btn(loc4=slide) → count(evaluate)
+    // Flow: expired(1) → view-only(2) → cookie(3) → email gate(4) → cookie(5)
+    //       → password(6) → submit(7+)
     let callCount = 0;
     const page = createMockPage({
       locator: vi.fn().mockImplementation(() => {
         callCount++;
-        if (callCount <= 2) return createLocator({ isVisible: vi.fn().mockResolvedValue(false) }); // view-only, expired
-        if (callCount === 3) return pwdLocator; // password input
+        if (callCount <= 5) return createLocator({ isVisible: vi.fn().mockResolvedValue(false) });
+        if (callCount === 6) return pwdLocator; // password input
         return slideLocator; // submit button + slide
       }),
       evaluate: vi.fn().mockResolvedValue(1),

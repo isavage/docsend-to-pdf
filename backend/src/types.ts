@@ -16,6 +16,9 @@ export interface ConversionJob {
   email?: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   progress: number; // 0-100
+  // Short human-readable phase label (e.g. "Opening your DocSend link") so the
+  // UI can show activity during the early stages where progress is still 0.
+  stage?: string;
   totalSlides?: number;
   capturedSlides: number;
   outputPath?: string;

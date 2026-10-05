@@ -11,6 +11,7 @@ interface ConversionJob {
   email?: string;
   status: string;
   progress: number;
+  stage?: string;
   totalSlides?: number;
   capturedSlides: number;
   outputPath?: string;
@@ -74,7 +75,14 @@ export default function App() {
         evtSource.close();
       }
     };
-    evtSource.onerror = () => evtSource.close();
+    evtSource.onerror = () => {
+      evtSource.close();
+      // Safety net: if the stream died mid-job, fetch the final state once.
+      fetch(`/api/jobs/${jobId}`, { credentials: 'same-origin' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => j && setJob(j))
+        .catch(() => {});
+    };
   }
 
   async function requestPitchDeckAnalysis(jobId: string) {
@@ -189,7 +197,7 @@ export default function App() {
             />
             <input
               type="email"
-              placeholder="Email for delivery (optional)"
+              placeholder="Email — unlocks gated links, PDF delivery (optional)"
               value={email}
               onChange={e => setEmail(e.target.value)}
               className="flex-1 px-4 py-2.5 text-xs bg-white/60 border border-gray-100 rounded-lg outline-none focus:border-[#635bff]/40 text-gray-700 placeholder-gray-400"
@@ -217,23 +225,43 @@ export default function App() {
       </section>
 
       {/* Progress / Result */}
-      {job && job.status !== 'pending' && (
+      {job && (
         <section className="max-w-lg mx-auto px-6 pb-12 animate-in">
           <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+              <span className={`text-xs font-medium px-2 py-1 rounded-full inline-flex items-center gap-1.5 ${
                 job.status === 'completed' ? 'bg-green-50 text-green-700' :
                 job.status === 'failed' ? 'bg-red-50 text-red-700' :
                 'bg-blue-50 text-blue-700'
               }`}>
-                {job.status === 'running' ? 'Converting...' : job.status}
+                {(job.status === 'pending' || job.status === 'running') && (
+                  <span className="spinner" aria-hidden="true" />
+                )}
+                {job.status === 'pending' ? 'Starting…'
+                  : job.status === 'running' ? (job.stage || 'Converting…')
+                  : job.status}
               </span>
-              <span className="text-xs text-gray-400">{job.progress}%</span>
+              <span className="text-xs text-gray-400">
+                {job.status === 'running' && job.totalSlides
+                  ? `${job.capturedSlides}/${job.totalSlides} slides`
+                  : `${job.progress}%`}
+              </span>
             </div>
-            {job.status === 'running' && (
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="progress-bar h-full rounded-full" style={{ width: `${job.progress}%` }} />
-              </div>
+            {(job.status === 'pending' || job.status === 'running') && (
+              <>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  {job.progress > 0 ? (
+                    <div className="progress-bar h-full rounded-full" style={{ width: `${job.progress}%` }} />
+                  ) : (
+                    // No numeric progress yet (browser launch / page load):
+                    // an indeterminate shimmer still shows the job is alive.
+                    <div className="progress-indeterminate h-full rounded-full" />
+                  )}
+                </div>
+                <p className="mt-2.5 text-xs text-gray-500">
+                  {job.stage || 'Queued — starting conversion…'}
+                </p>
+              </>
             )}
             {job.status === 'completed' && (
               <div className="space-y-3">

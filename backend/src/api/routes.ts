@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { DocSendConverter } from '../services/converter.js';
+import { DocSendConverter, BROWSER_STEALTH_ARGS } from '../services/converter.js';
 import type { ConversionRequest, ConversionJob } from '../types.js';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs/promises';
@@ -26,6 +26,7 @@ async function processJob(jobId: string, request: ConversionRequest) {
   if (!job) return;
 
   job.status = 'running';
+  job.stage = 'Starting';
   job.updatedAt = new Date();
 
   try {
@@ -34,20 +35,29 @@ async function processJob(jobId: string, request: ConversionRequest) {
       job.progress = pct;
       job.updatedAt = new Date();
     };
+    const onStage = (stage: string) => {
+      job.stage = stage;
+      job.updatedAt = new Date();
+    };
 
     const browserFactory = async () => {
       const { chromium } = await import('playwright');
       return chromium.launch({
         headless: true,
         executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium',
-        args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+        args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', ...BROWSER_STEALTH_ARGS],
       });
     };
 
-    const resultJob = await converter.convert(request, { launchBrowser: browserFactory, onProgress });
+    const resultJob = await converter.convert(request, {
+      launchBrowser: browserFactory,
+      onProgress,
+      onStage,
+    });
     Object.assign(job, resultJob);
   } catch (err: unknown) {
     job.status = 'failed';
+    job.stage = undefined;
     job.error = err instanceof Error ? err.message : String(err);
   } finally {
     job.updatedAt = new Date();

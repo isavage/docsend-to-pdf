@@ -32,6 +32,33 @@ body {
   transition: width 0.3s ease;
 }
 
+/* Indeterminate bar shown while the job runs but has no numeric progress yet */
+.progress-indeterminate {
+  width: 40%;
+  background: linear-gradient(90deg, var(--color-primary), #8b8dff);
+  animation: indeterminateSlide 1.4s ease-in-out infinite;
+}
+
+@keyframes indeterminateSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+/* Small inline spinner for the status badge */
+.spinner {
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(29, 78, 216, 0.25);
+  border-top-color: #1d4ed8;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .pricing-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(99, 91, 255, 0.12);

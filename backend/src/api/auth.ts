@@ -44,6 +44,79 @@ function fail(res: Response, err: unknown) {
   return res.status(500).json({ error: 'Internal error' });
 }
 
+/** Branded page shown after clicking the email verification link. */
+function verificationPageHtml(ok: boolean): string {
+  const brand = '#635bff';
+  const icon = ok
+    ? `<svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true"><circle cx="28" cy="28" r="28" fill="${brand}" fill-opacity="0.12"/><circle cx="28" cy="28" r="21" fill="${brand}"/><path d="M20 28.5l5.5 5.5L37 22.5" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    : `<svg width="56" height="56" viewBox="0 0 56 56" fill="none" aria-hidden="true"><circle cx="28" cy="28" r="28" fill="#f59e0b" fill-opacity="0.14"/><circle cx="28" cy="28" r="21" fill="#f59e0b"/><path d="M28 19v12" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/><circle cx="28" cy="37" r="2" fill="#fff"/></svg>`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${ok ? 'Email confirmed' : 'Verification failed'} — DocSend PDF</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(160deg, #f4f5fb 0%, #eef0ff 100%);
+    color: #1a1f36;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(26, 31, 54, 0.10);
+    max-width: 420px;
+    width: 100%;
+    padding: 44px 36px 36px;
+    text-align: center;
+  }
+  .icon { margin-bottom: 20px; }
+  h1 { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+  p { font-size: 0.95rem; line-height: 1.6; color: #6b7280; margin-bottom: 26px; }
+  p strong { color: #1a1f36; }
+  .btn {
+    display: inline-block;
+    padding: 13px 30px;
+    background: ${brand};
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 12px;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .btn:hover { background: #5048e7; transform: translateY(-1px); }
+  .brand {
+    margin-top: 30px;
+    font-size: 0.8rem;
+    color: #9ca3af;
+  }
+  .brand a { color: #9ca3af; }
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="icon">${icon}</div>
+    <h1>${ok ? 'Email confirmed 🎉' : 'Link doesn\u2019t work'}</h1>
+    <p>${ok
+      ? 'Your account is now a <strong>member</strong> \u2014 conversions up to <strong>' +
+        CONFIG.memberTierMaxSlides.toLocaleString() +
+        ' slides</strong> are unlocked. Head back to the app to start converting.'
+      : 'This verification link is invalid, expired, or was already used. Open the app, sign in, and request a fresh link from the banner at the top.'}</p>
+    <a class="btn" href="${CONFIG.publicUrl}/">${ok ? 'Go to DocSend PDF' : 'Sign in again'} \u2192</a>
+    <div class="brand">DocSend PDF \u00b7 <a href="${CONFIG.publicUrl}">docsend-to-pdf.online</a></div>
+  </main>
+</body>
+</html>`;
+}
+
 // Whether the server is configured to allow Google sign-in.
 router.get('/config', (_req: Request, res: Response) => {
   res.json({
@@ -123,15 +196,7 @@ router.get('/verify', (req: Request, res: Response) => {
   // consumeVerifyToken only resolves the token — persist the verification on
   // the user row, otherwise the SPA keeps showing the "verify your email" banner.
   if (user) markEmailVerified(user.id);
-  res.status(user ? 200 : 400).type('html').send(`<!doctype html><meta charset="utf-8">
-<title>Email verification</title>
-<body style="font-family:-apple-system,system-ui,sans-serif;max-width:480px;margin:15vh auto;text-align:center;padding:0 24px">
-<h2>${user ? '✅ Email confirmed' : '⚠️ Invalid or expired link'}</h2>
-<p>${user
-    ? 'Your account is now a member. You can close this tab and go back to the app.'
-    : 'This verification link is invalid or has already been used.'}</p>
-<p><a href="${CONFIG.publicUrl}" style="color:#635bff">Go to DocSend PDF →</a></p>
-</body>`);
+  res.status(user ? 200 : 400).type('html').send(verificationPageHtml(!!user));
 });
 
 // Re-send the verification email for the logged-in user.
